@@ -5,20 +5,55 @@ var fv;
 var gmapLookupCache = {};
 var sidebarFxn;
 var program_courses;
+//Only download nicknames once and store it globally
+var nicknames;
+
+var visited=[0];
+/*var display_tutorial= function(){
+		$(".carousel-inner").append(`<div class="item ng-scope testing" ng-class="::{active: $index == 0}" ng-repeat="image in ::images track by $index" ng-switch="" on="breakpoint.class == 'mobile' || 'null'"><button ng-click="nextModal(); $("#myModal").modal();" alt="" ng-switch-when="null" class="ng-scope" >TESTING</p></button>`);
+		//console.log("AAAAAbbbbAAAAA");
+}*/
+var reset= function(){
+	localStorage.removeItem("fightme");
+	//display_tutorial();
+	//console.log("test")	;
+}
+
+// Preloads images
+let images = ["https://arc-anglerfish-arc2-prod-spectator.s3.amazonaws.com/public/WXYIQ7WYXFAHDLBRZM244A46EE.gif",
+"https://arc-anglerfish-arc2-prod-spectator.s3.amazonaws.com/public/ZH7EYKF4KRGB7M2I4FAOYVP7TI.jpg",
+"https://arc-anglerfish-arc2-prod-spectator.s3.amazonaws.com/public/23S7APGKT5HSTA5MVJZBP5NLCE.gif",
+"https://arc-anglerfish-arc2-prod-spectator.s3.amazonaws.com/public/2O4NG72V5BHRZGSSBZPZQUBU6U.gif",
+"https://arc-anglerfish-arc2-prod-spectator.s3.amazonaws.com/public/WVSGGJPEOJDCZHLBUQGH3AVVCY.png"]
+
+images.forEach(url => {
+	let image = new Image()
+	image.src = url
+})
+
+var prof_rate=["Harsh","Somewhat Harsh","Fair","Somewhat Lenient", "Lenient"];
+var organized =["Very disorganized", "Somewhat disorganized", "Average", "Somewhat organized", "Very organized"];
+var disToAgree = ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"];
 
 var changeSidebarFxn = function() {
 	var selected_fxn = $('#sidebar_select').val();
-	if (selected_fxn == 'Requirements') {
-		sidebarFxn = 'Requirements';
+	if (selected_fxn === 'Requirements') {
+		sidebarFxn = 'Major Requirements Checklists';
 		$('#school_select').show();
+		$('#program_chosen').show();
+		$('#program-information').show();
+		$('#coreswap').hide();
+		$('#loginprompt').hide();
 		showProgBar();
-	} else {
+	} else if (selected_fxn === 'Swap') {
 		sidebarFxn = 'Swap';
-		$('#program_chosen').css("display","none");
-		$('#school_select').css("display","none");
+		$('#program_chosen').hide();
+		$('#school_select').hide();
+		$('#program-information').hide();
+		$('#coreswap').show();
+		$('#loginprompt').show();
 	}
 }
-
 var showProgBar = function() {
 	$('#program_chosen').show(); // show prog bar
 }
@@ -1108,11 +1143,11 @@ app.factory('Filters', function($http) {
 	// Filters = $http.get('feeds/filters.js');
 
 	program_courses = [];
-	// var my_url = 'http://localhost:3000/api/getDeptData';
+	var my_url = 'https://ves.columbiaspectator.com/api/getDeptData';
 	// var fn = "local.json";
 
-	var my_url = 'https://ves.columbiaspectator.com/api/getDeptData';
-	var schools = ['BC','CC','GS'];
+	// var my_url = 'https://ves.columbiaspectator.com/api/getDeptData';
+	var schools = ['GS','SEAS','CC'];
 
 	var promises = [];
 	for (var i=0; i<schools.length; i++) {
@@ -1127,40 +1162,42 @@ app.factory('Filters', function($http) {
 		promises.push(majorDataGet);
 	}
 
-	Promise.all(promises).then( function(datas) {
-		// console.log(datas);
-
-		for (i=0; i<datas.length; i++) {
-			var this_school = JSON.parse(datas[i]['config']['data'])['School'];
-			var new_data = [];
-			var this_data = datas[i]['data'].sort();
-			for (var j=0; j<this_data.length; j++) {
-				var this_item = this_data[j];
-				var label_words = this_item.split("-");
-				for (var k=0; k<label_words.length; k++) {
-					label_words[k] = label_words[k].charAt(0).toUpperCase() + label_words[k].slice(1);
-				}
-				var label = label_words.join(" ");
-				program_courses.push({"label": this_school + ": " + label, "value": this_item})
-			}
-		}
-	})
-
 	Filters = $http.get('feeds/filters.js');
 	return {
-		getVars: function() {
-			return Filters.then(function(result) {
-				// console.log(result);
-				result.data.filters['program_courses'] = program_courses;
-				return result.data;
-			});
+		getVars:
+		function() {
+			return Promise.all(promises).then( function(datas) {
+
+				for (i=0; i<datas.length; i++) {
+					var this_school = JSON.parse(datas[i]['config']['data'])['School'];
+					var new_data = [];
+					var this_data = datas[i]['data'].sort();
+					for (var j=0; j<this_data.length; j++) {
+						var this_item = this_data[j];
+						var label_words = this_item.split("-");
+						for (var k=0; k<label_words.length; k++) {
+							label_words[k] = label_words[k].charAt(0).toUpperCase() + label_words[k].slice(1);
+						}
+						var label = label_words.join(" ");
+						var to_insert = {"label": this_school + ": " + label, "value": this_item};
+						if (program_courses.indexOf(to_insert)<0) {
+							program_courses.push(to_insert);
+						}
+					}
+				}
+				return Filters.then(function(result) {
+					// console.log(result);
+					//console.log(program_courses)
+					result.data.filters['program_courses'] = program_courses;
+					return result.data;
+				});
+			})
 		}
 	}
 });
 
 app.factory('CWFeeds', function($http) {
 	CWFeeds = $http.get('feeds/cw.js');
-	nicknames = $http.post('https://ves.columbiaspectator.com/api/getNicknames');
 
 	return {
 		getVars: function() {
@@ -1169,7 +1206,7 @@ app.factory('CWFeeds', function($http) {
 					nicknamesArray = Object.keys(ourresult.data[0]);
 					nicknamesArray.shift();
 					//https://stackoverflow.com/questions/29719329/convert-array-into-upper-case
-					toUpper = function(x){ 
+					toUpper = function(x){
 					  return x.toUpperCase();
 					};
 					nicknamesArray = nicknamesArray.map(toUpper);
@@ -1473,7 +1510,443 @@ app.controller("courses", function($scope, $routeParams) {
 });
 */
 
-app.controller("global", function($scope, $location, $http, $timeout, Variables, Filters, UserInfo, UserFavorites, CWFeeds) {
+app.controller("global", function($scope,$compile, $location, $http, $timeout, Variables, Filters, UserInfo, UserFavorites, CWFeeds) {
+	// Custom modal
+
+	var modalCounter=(-1);
+	function modalContent(a,b,c,d){
+		this.heading= a;
+		this.instructions= b;
+		this.footer=c;
+		this.image_url=d;
+	}
+
+	$scope.custom_modal = {
+		title: "Core Swap Submit",
+		body:	` <div class="modal-item">
+                  <h2>You want:</h2>
+                  <div id="modalwant" ng-repeat="i in listing.setToArray(listing.want)">
+                   <p>{{i.split(", ")[0]}}</br>Section {{i.split(", ")[1]}}</p>
+                  </div>
+                  <h2>You have:</h2>
+                  <div id="modalhave" ng-repeat="i in listing.setToArray(listing.have)">
+                   <p>{{i.split(", ")[0]}}</br>Section {{i.split(", ")[1]}}</p>
+                  </div>
+                </div>`
+
+
+	}
+	var tutorial_intro = `<p class="tut_text"  >Thank you for downloading Vergil+!
+
+	The extension is now active, and you can see live class enrollments, organize requirements with the major checklist, enjoy a smarter search bar, and export your class schedule to iCal or Google Calendar.
+
+	More features are coming soon, and please send us your feedback to <a href="mailto:vergilplus@columbiaspectator.com">vergilplus@columbiaspectator.com</a>.</p>`;
+	
+
+	angular.element(document).ready(function () {
+	if (localStorage.getItem("fightme") == null) {
+
+			modalCounter=-1;
+			$scope.nextModal();
+			localStorage.setItem("fightme", true);
+			$("#myModal").modal();
+	}
+
+	if (window.navigator.standalone == true) {
+		$("body").addClass("full-screen-app");
+	}
+
+	 var header = document.querySelector("#program-course-lookup .heading");
+	// header.setAttribute("style", "height:100px;");
+
+	if (iOSver = iOSversion()) {
+		if (iOSver[0] < 8) {
+			/* iOS7 position fixed: http://dansajin.com/2012/12/07/fix-position-fixed/ */
+			if (Modernizr.touch) {
+				var $body = $("body");
+
+				$(document).on('focus', 'input', function(e) {
+					$body.addClass('fixfixed');
+				}).on('blur', 'input', function(e) {
+					$body.removeClass('fixfixed');
+				});
+			}
+		}
+	}
+});
+	console.log(Filters)
+
+//find me. Check submitForm for new submitFn
+	// $scope.submitReview = function(e){
+	// 	// 
+
+	// 	var radios = document.getElementsByName('score');
+	// 	var slider = document.getElementById('hourRange')
+	// 	var tags = document.getElementsByName('courseTag')
+	// 	var chosenTags = [];
+
+
+	// 	for (var i = 0, length = radios.length; i < length; i++){
+	// 		if (radios[i].checked){
+	// 			var score = radios[i].value;
+	// 			break;
+	// 		}
+	// 	}
+	// 	for (var j = 0, length = tags.length; j < length; j++){
+	// 		if(tags[j].checked){
+	// 			// console.log(tags[j].value)
+	// 			chosenTags.push( tags[j].value );
+	// 		}
+	// 	}
+	// 	console.log(chosenTags);
+	// 	console.log(score)
+	// 	console.log(slider.value)
+
+
+
+		
+	// 	// console.log($("#submitReviewForm").$('input'));
+
+	// 	// score
+	// 	// console.log( $("#submitReviewForm").find("[name='score']"));
+	// 	//console.log( $("#submitReviewForm").find("[name='score']").find("[checked=true]"));
+
+	// 	// // $.ajax({
+	// 	// 	method: 'GET',
+	// 	// 	url: 'https://google.com',
+	// 	// 	success: function(data, status) {
+	// 	// 		console.log(data, "DATA, STATUS ", status)
+	// 	// 		alert(data);
+	// 	// 	}
+
+	// 	// })
+	// }
+
+	$scope.modalChange= function (title, body, footer){
+		$scope.custom_modal.title=title;
+		$scope.custom_modal.body=body;
+		$scope.custom_modal.footer=footer;
+		$("#myModal .modal-title").html($compile(title)($scope)[0])
+		$("#myModal .modal-body").html($compile(body)($scope)[0])
+		$("#myModal .modal-footer").html($compile(footer)($scope)[0])
+		if (!footer) $("#myModal .modal-footer").hide()
+		else $("#myModal .modal-footer").show()
+	}
+
+	$scope.starClick = function(i) {
+		$scope.starsHover(i);
+		blockUnhover = true;
+	}
+
+	$scope.blockUnhover = false;
+
+	$scope.starsHover = function(i) {
+		blockUnhover = false;
+		stars = document.getElementsByClassName("stars");
+		for (j=0; j<stars.length; j++) {
+			star = stars[j];
+			if (star.getAttribute("score") <= i) {
+				$(star).html("★");
+				star.style.color = "#e8a552";
+			} else {
+				$(star).html("☆");
+				star.style.color = "#003087";
+			}
+		}
+	}
+
+	$scope.starUnhover = function(i) {
+		if (!blockUnhover) {
+			stars = document.getElementsByClassName("stars");
+			for (j=0; j<stars.length; j++) {
+				star = stars[j];
+				$(star).html("☆");
+				star.style.color = "#003087";
+			}
+		}	
+	}
+	$scope.callModal=function(){
+		modalCounter=(-1);
+		$scope.nextModal();
+		$("#myModal").modal();
+		
+	}
+	$scope.modalCount=function(count){
+		modalCounter=count;
+	}
+	$scope.modalVisit=function(){
+		
+		var v_list=document.querySelectorAll(".toc");
+		visited.forEach(function(element){
+			if ((element-2)>=0){
+			v_list[element-2].classList.add("visited")
+		}
+		})
+	}
+	$scope.nextModal= function(){
+		modalCounter++;
+		if (!(visited.includes(modalCounter))){
+		visited.push(modalCounter);
+		}
+		
+		$scope.modalChange($scope.tutorial_features[modalCounter].heading,$scope.tutorial_features[modalCounter].instructions,$scope.tutorial_features[modalCounter].footer);
+		if(modalCounter==1){
+			$scope.modalVisit();
+		}
+	}
+	$scope.prevModal= function(){
+		modalCounter--;
+		if (!(visited.includes(modalCounter))){
+		visited.push(modalCounter);
+		}
+		$scope.modalChange($scope.tutorial_features[modalCounter].heading,$scope.tutorial_features[modalCounter].instructions,$scope.tutorial_features[modalCounter].footer);
+		
+		if(modalCounter==1){
+			$scope.modalVisit();
+		}
+	}
+	//var osburl=chrome.runtime.getURL("/content_images/open_sidebar.gif");
+	//var ssurl=chrome.runtime.getURL("/content_images/smart_search.gif");
+	//var gcurl=chrome.runtime.getURL("/content_images/gcal.gif");
+	var s_search_text=`   We call it Lit Hum, but they call it “Masterpieces of Western
+	 Literature and Philosophy.” With Smart Search, enter common names for classes and 
+	 get the results that you are looking for.`;
+	var live_enroll_text=`   Optimize your schedule with the Live Enrollments feature . 
+	See how many students have enrolled in a class before adding it to your schedule.`;
+	var gcal_text=`   Ever feel like your life is falling apart? We totally understand. 
+	The debugged Export Calendar feature can add your class schedule to Google Calendar or iCal, 
+	so you know when you have to be responsible and when you don’t.`;
+
+	var tutorial_buttons="<div><button class='btn btn-default' ng-click='modalCount(0);nextModal()'>Back</button>";
+	var c_images="../content_images";
+	var sidebar=`<div><p class='tut_text'>Access CoreSwap and Major Checklist through the sidebar.</p><img src= 'https://arc-anglerfish-arc2-prod-spectator.s3.amazonaws.com/public/WXYIQ7WYXFAHDLBRZM244A46EE.gif' class="tut_img"></div> `;
+	var liveEnrollment=`<div><p class='tut_text'>${live_enroll_text}</p><img src='https://arc-anglerfish-arc2-prod-spectator.s3.amazonaws.com/public/ZH7EYKF4KRGB7M2I4FAOYVP7TI.jpg' class='tut_img'></div>`
+	var s_search=`<div><p class='tut_text'>${s_search_text}</p><img src="https://arc-anglerfish-arc2-prod-spectator.s3.amazonaws.com/public/23S7APGKT5HSTA5MVJZBP5NLCE.gif" class= "tut_img"></div>`;
+	var gcal_tutorial=`<div><p class='tut_text'>${gcal_text}</p><img src="https://arc-anglerfish-arc2-prod-spectator.s3.amazonaws.com/public/2O4NG72V5BHRZGSSBZPZQUBU6U.gif" class="tut_img"></div>`;
+	var close_img=`<img class='tut_img' src='https://arc-anglerfish-arc2-prod-spectator.s3.amazonaws.com/public/WVSGGJPEOJDCZHLBUQGH3AVVCY.png'>`
+
+	$scope.tutorial_features=[
+		new modalContent("<h3>Welcome</h3>",`${tutorial_intro}`,"<div><button class='btn btn-default' ng-click='nextModal()'>Next</button></div>"),
+		new modalContent("<h3>Table of Contents</h3>",`<div class="tut_text">
+												<div class="tut_arrow">></div><div class='toc' ng-click='modalCount(1);nextModal()'>Open Sidebar</div><br/>
+											  <div class="tut_arrow">></div><div class='toc' ng-click='modalCount(2);nextModal()'>Smart Search</div><br/> 
+										    <div class="tut_arrow">></div><div class='toc' ng-click='modalCount(3);nextModal()'>Live Class Enrollment</div><br/> 
+											  <div class="tut_arrow">></div><div class='toc' ng-click='modalCount(4);nextModal()'>GCal Export</div></div>`,`<button class='btn btn-default' ng-click='modalCounter=0;' data-dismiss='modal'>Close</button>`),
+		new modalContent("<h3>Open Sidebar</h3>",`${sidebar}`,`${tutorial_buttons}`), 
+		new modalContent("<h3>Smart Search</h3>",`${s_search}`,`${tutorial_buttons}`), 
+		new modalContent("<h3>Live Class Enrollment</h3>",`${liveEnrollment}`,`${tutorial_buttons}`),
+		new modalContent("<h3>GCal Export</h3>",`${gcal_tutorial}`,`${tutorial_buttons}`)
+	]
+	$scope.gcal = {
+		callback: () => {
+			$().vergilgcal_modal_callback()
+
+		}
+	}
+	$scope.moreInfoClicked = function(course, professor){
+		// yayyy
+		console.log("user requested more information on ", course, professor)
+	}
+	$scope.submitForm = function(course){
+		console.log("submit the stuff", course)
+		var gradYear;
+		var school;
+		var semester;
+		$("#yearQ input").each(function(i){
+			if($(this).prop("checked")){
+				gradYear = $(this).prop("value").toLowerCase();
+			}
+		})
+		$("#schoolQ input").each(function(i){
+			if($(this).prop("checked")){
+				school = $(this).prop("value")
+			}
+		})
+		var major = $("#majorEntry textarea").val()
+		var secondMajor = $("#secondMajor textarea").val()
+		var profName = $("#professorName textarea").val()
+		var semester = $("#SeasonQ").val() + " " + $("#YearQ").val()
+		var hoursPerWeek = parseInt($("#hoursPerWeek input").val())
+		var grading = parseInt($("#prof_rating").prop("value"))
+		var interest = parseInt($("#interest_class").prop("value"))	
+		var whyInterest = $("#whyInteresting textarea").val();
+		var goodTeacher = parseInt($("#good_teacher").prop("value"))
+		var selfTeaching = parseInt($("#self_teaching").prop("value"))
+		var easyA = parseInt($("#easy_a").prop("value"))
+		var organization = parseInt($("#organizational_skills").prop("value"))
+		var recommend = parseInt($("#recommend_prof").prop("value"))
+		var whyRecommend = $("#recommendProfText textarea").val()
+
+		var chosenTags = []
+		$("#tagChoices input").each(function(i){
+			if($(this).prop("checked")){
+				chosenTags.push($(this).prop("value").toLowerCase());
+			}
+		})
+		// Make up personal stuff for demo purpose Change for correctness.
+		var jsonLoad = 	{"personal":
+			{
+				"year": gradYear,
+				"school": school,
+				"major": major,
+				"concentration": secondMajor,
+				"semester": semester
+			},
+			"hoursPerWeek": hoursPerWeek,
+			"grading": grading,
+			"interesting": interest,
+			"whyInteresting": whyInterest,
+			"effective": goodTeacher,
+			"selfTeach": selfTeaching,
+			"organized": organization,
+			"recommendation": recommend,
+			"explain_recommendation": whyRecommend,
+			"factors": chosenTags,
+			"professor": profName,
+			"courseNumber": course,
+			"A-possible": easyA,
+			"requirement": false
+		}
+		console.log(jsonLoad)
+		$http({
+			method: 'POST',
+			url: "https://ves.columbiaspectator.com/api/putReviews", //localhost needs to be changed eventually everywhere in file. Also http -> https after testing everywhere in file
+			headers: {'Content-Type':'application/json'},
+			data: jsonLoad,
+		}).success(function(data, status) {
+			console.log(data, "and status is", status)
+			if(data["Success"]){
+				$('#myModal').modal('hide');
+			} else {
+				alert("There was an issue sorry please try again")
+			}
+		});
+		
+	}
+	// Allow console logging
+	$scope.listing = {
+		choosing: null,
+		close: ()=>{
+			console.log("check")
+			$("#myModal").modal()
+		},
+		toggleMode: (intent) => {
+			console.log($scope.listing.choosing)
+			console.log(intent)
+			if ($scope.listing.choosing === intent) $scope.listing.choosing = null
+			else $scope.listing.choosing = intent
+			console.log($scope.listing.choosing)
+		},
+		getMode: () => {
+			return $scope.listing.choosing
+		},
+		want: new Set(),
+		have: new Set(),
+		haveremove: (item) => {
+			$scope.listing.have.delete(item);
+		},
+		wantremove: (item) => {
+			$scope.listing.want.delete(item);
+		},
+		clearListing: () => {
+			$scope.listing.want.clear();
+			$scope.listing.have.clear();
+		},
+		isEmpty: () => {
+			return $scope.listing.want.size == 0 || $scope.listing.have.size == 0;
+		},
+		emptyAlert: () => {
+			alert("You need to select at least one class you want and one class you have!");
+		},
+		setToArray: (set) => {
+			return [...set]
+		},
+		log: () => {
+			console.log($scope.listing.want);
+			console.log($scope.listing.have);
+		},
+		has: (item) => {
+			let want = $scope.listing.want
+			let have = $scope.listing.have
+			let choosing = $scope.listing.choosing
+			if (choosing === "I Want This") {
+				return want.has(item)
+			}
+			else if (choosing === "I Have This") {
+				return have.has(item)
+			}
+		},
+		toggle: (item) => {
+			let want = $scope.listing.want
+			let have = $scope.listing.have
+			let choosing = $scope.listing.choosing
+			if (choosing === "I Want This") {
+				if (want.has(item)) {
+					want.delete(item)
+				}
+				else want.add(item)
+			}
+			else if (choosing === "I Have This") {
+				if (have.has(item)) {
+					have.delete(item)
+				}
+				else have.add(item)
+			}
+		},
+		testFilter: (item) => {
+			whitelist = ["CC1001", "CC1002", "CC1100", "CC1010", "GS1010", "S1010", "CC1101", "CC1102", "UN1121", "S1121", "UN1123", "S1123"]
+			return whitelist.includes(item)
+		},
+		modal: () => {
+		$scope.modalChange("Core Swap Submit",
+		` <div class="modal-item">
+                  <h2>You want:</h2>
+                  <div id="modalwant" ng-repeat="i in listing.setToArray(listing.want)">
+                   <p>{{i.split(", ")[0]}}</br>Section {{i.split(", ")[1]}}</p>
+                  </div>
+                  <h2>You have:</h2>
+                  <div id="modalhave" ng-repeat="i in listing.setToArray(listing.have)">
+                   <p>{{i.split(", ")[0]}}</br>Section {{i.split(", ")[1]}}</p>
+                  </div>
+                </div>`,`<div><button type="button" class="btn btn-default" ng-click="listing.clearsubmit();" data-dismiss="modal">Close</button>
+              <button id="submit" type="button" class="btn btn-default" ng-click="clicked=true; listing.upload(userinfo.data.uni); listing.confirmsubmit(); listing.clearListing(); listing.close();" data-dismiss="modal">Submit</button>
+			  </div>`);
+			$("#myModal").modal('show');
+		},
+		upload: (uni) => {
+			var returnJson = {};
+			returnJson.want = [...$scope.listing.want];
+			returnJson.have = [...$scope.listing.have];
+			if(returnJson.want.length == 0 && returnJson.have.length == 0) {
+				console.log("error yo!");
+			}
+
+			//console.log(new Set([...$scope.listing.want].filter(x => $scope.listing.have.has(x))).size > 0);
+
+			returnJson.uni = uni;
+			if(new Set([...$scope.listing.want].filter(x => $scope.listing.have.has(x))).size > 0) {
+				alert("you're trying to add a class you already have :/");
+				$('#success').hide();
+				$('#submit').show();
+			} else {
+				// $http.post('https://ves.columbiaspectator.com/api/coreSwap', returnJson);
+				$http.post('https://ves.columbiaspectator.com/api/coreSwap', returnJson);
+				$('#success').show();
+				$('#submit').hide();
+			}
+			console.log(returnJson);
+			$scope.listing.choosing = null;
+			
+		},
+		clearsubmit: () => {
+			$('#success').hide();
+			$('#submit').show();
+		}
+	}
+
+	//Instantiate nicknames
+	// nicknames = $http.post('https://ves.columbiaspectator.com/api/getNicknames');
+	nicknames = $http.post('https://ves.columbiaspectator.com/api/getNicknames');
 	$scope.global = {
 		variables: {},
 		basicFiltersShown: 1,
@@ -1581,6 +2054,9 @@ app.controller("global", function($scope, $location, $http, $timeout, Variables,
 		if ($scope.global.showprogwidget) {
 
 			$("#progwidget button").tooltip('destroy').removeAttr("data-toggle");
+			var  check= $("#sela_form");
+			check.parent().html("");
+			
 
 			// Add basic html dropdown
 			var form = document.createElement("form");
@@ -1589,10 +2065,15 @@ app.controller("global", function($scope, $location, $http, $timeout, Variables,
 			sel.setAttribute("name", "sidebar_fxns");
 			sel.setAttribute("id", "sidebar_select");
 			sel.setAttribute('onChange', 'changeSidebarFxn();');
-			vals = ['Course Swap','Major Requirements'];
+
+			var heading = $('.heading').get(0);
+			//heading.setAttribute("style", "height:100px;");
+
+			vals = ['Core Swap', 'Major Requirements Checklists'];
 			for (var i=0; i<vals.length; i++) {
 				var opt = document.createElement("option");
 				opt.setAttribute("value", vals[i].split(" ")[1]);
+				// if (vals[i] === 'Core Swap') opt.disabled = true;
 				opt.innerHTML = vals[i];
 				sel.appendChild(opt);
 			}
@@ -1601,13 +2082,13 @@ app.controller("global", function($scope, $location, $http, $timeout, Variables,
 
 			// Add school dropdown
 			var school_form = document.createElement("form");
-			school_form.setAttribute("id", "schoolform_a")
+			school_form.setAttribute("id", "schoolform_a");
 			var school_sel = document.createElement("select");
 			school_sel.setAttribute("name", "major_school");
 			school_sel.setAttribute("id", "school_select");
 			school_sel.setAttribute("onChange", "showProgBar();");
 
-			school_vals = ['BC', 'CC', 'GS', 'SEAS'];
+			school_vals = ['CC','SEAS','GS'];
 			for (var i=0; i<school_vals.length; i++) {
 				var opt = document.createElement("option");
 				opt.setAttribute("value", school_vals[i])
@@ -1618,8 +2099,11 @@ app.controller("global", function($scope, $location, $http, $timeout, Variables,
 			heading.insertBefore(school_form, heading.firstChild);
 			heading.insertBefore(form, heading.firstChild);
 
-			$('#program_chosen').css('display', 'none');
-			$('#school_select').css('display', 'none');
+			$('#school_select').hide();
+			$('#program_chosen').hide();
+			$('#program-information').hide();
+			$('#coreswap').show();
+			$('#loginprompt').show();
 		} else {
 			$('#sidebar_select').remove();
 			$('#sela_form').remove();
@@ -2121,11 +2605,6 @@ CWFeeds.getVars().then(function(result) {
 		var classSuggestions,
 		classDefaults = [];
 
-		fetch("https://ves.columbiaspectator.com/api/getNicknames", {method: "post"})
-        .then(function(resp) {
-          return resp.json();
-        })
-
 		classSuggestions = result.class_title;
 
 		if ($scope.global.filters.popular_search_terms) {
@@ -2193,29 +2672,7 @@ $timeout(function() {
     */
 }, 2000);
 
-angular.element(document).ready(function () {
-	if (window.navigator.standalone == true) {
-		$("body").addClass("full-screen-app");
-	}
 
-	var header = document.querySelector("#program-course-lookup .heading");
-	header.setAttribute("style", "height:100px;");
-
-	if (iOSver = iOSversion()) {
-		if (iOSver[0] < 8) {
-			/* iOS7 position fixed: http://dansajin.com/2012/12/07/fix-position-fixed/ */
-			if (Modernizr.touch) {
-				var $body = $("body");
-
-				$(document).on('focus', 'input', function(e) {
-					$body.addClass('fixfixed');
-				}).on('blur', 'input', function(e) {
-					$body.removeClass('fixfixed');
-				});
-			}
-		}
-	}
-});
 
 });
 
@@ -2637,6 +3094,7 @@ $scope.processCoursesData = function(data) {
 					'number': thisCourse.bulletin.code + thisCourse.number,
 					'number2': thisCourse.bulletin.code_2.trim() + thisCourse.number,
 					'subject': thisCourse.subject.long_name,
+					'ribbit': "http://bulletin.columbia.edu/ribbit/index.cgi?page=getcourse.rjs&code=" + thisCourse.subject.subject_code + "%20" + thisCourse.bulletin.code_2.trim() + thisCourse.number,
 					'title': (thisCourse.course_name) ? thisCourse.course_name : thisCourse.classes.class[0].title,
 					'subterm': (deeptest(thisCourse, "subterm.name")) ? thisCourse.subterm.name : null,
 					'headingToggle': 0
@@ -2746,11 +3204,12 @@ $scope.processCoursesData = function(data) {
 					'callNumber': thisSection.call_number,
 					'description': (thisSection.description) ? thisSection.description.trim() : '',
 					// 'enrollment': (thisSection.enrollment.max && thisSection.enrollment.max != 999) ? thisSection.enrollment.max + ' max' : '',
-					'status': (thisSection.enrollment.status == "F") ? " (Full)" : ' (' + thisSection.enrollment.count + "/" + thisSection.enrollment.max + ')',
+					'status': (thisSection.enrollment.status == "F") ? " (Full)" : (thisSection.enrollment.count != "") ? ' (' + thisSection.enrollment.count + "/" + thisSection.enrollment.max + ')' : ' (' + 0 + "/" + thisSection.enrollment.max + ')',
 					'note': thisSection.note,
 					'openTo': thisSection.open_to,
 					'sectionKey': thisSection.section_key,
 					'universalCourseIdentifier': thisSection.universal_course_identifier,
+					'listingValue': ((thisCourse.course_name) ? thisCourse.course_name : thisCourse.classes.class[0].title) + ", " + section + ", " + thisSection.universal_course_identifier,
 					'type': thisSection.type.name,
 					'website': thisSection.website.name,
 					'websiteUrl': thisSection.website.url,
@@ -2892,20 +3351,18 @@ refresh = function() {
       }
       */
 
-      fetch("https://ves.columbiaspectator.com/api/getNicknames", {method: "post"})
+      nicknames
         .then(function(resp) {
-          return resp.json();
-        }).then(function(data) {
-          nicknamesJson = data[0];
+        	//console.log(resp);
+          nicknamesJson = resp.data[0];
         }).then(function() {
-					keywords = keywords.toLowerCase();
           $.each(nicknamesJson, function(k, v) {
-            if(keywords == k) {
+            if(keywords.toLowerCase() === k.toLowerCase()) {
               keywords = v;
             }
           });
         }).then(function() {
-          console.log(keywords);
+          //console.log(keywords);
         }).then(function() {
           params["key"] = keywords;
 
@@ -3362,7 +3819,19 @@ $('#levels').noUiSlider({
   	$timeout(function() {
   		$("#search-button").focus().blur();
   		$scope.form.search = $("#search").typeahead('val');
-  		$scope.searchStart();
+
+  		nicknames.then((result) => {
+  			return result = result.data[0];
+  		})
+  		.then((result) => {
+  			$scope.form.search = $scope.form.search.toLowerCase();
+        $.each(result, function(k, v) {
+          if($scope.form.search === k.toLowerCase()) {
+            $scope.form.search = v;
+          }
+        });
+  			$scope.searchStart();
+  		})
   	}, 0);
   });
 
@@ -3918,7 +4387,850 @@ $scope.modalBooks = function(section, course) {
 	$scope.courseModal();
 }
 
+// $scope.hoverEnterReviewsButton = function(section, course) {
+// 	console.log("Ay you HOVERED THO")
+// }
+
+// $scope.hoverLeaveReviewsButton = function(section, course) {
+// 	console.log("Ay you LEFT THO")
+// }
+
+$scope.reviewsButton = function(section, course) {
+	$scope.$parent.modalSection = section;
+	$scope.$parent.modalCourse = course;
+	var profName = $scope.modalSection.instructors[0].name;
+	var courseNumber = course.title; 
+	console.log("Getting reviews for:", name);
+
+	//testing...
+	// name = "Ken Ross"
+	// console.log("jk we only have 2 people in our database, getting our boi Ken Ross instead");
+
+	$http({
+	    method: 'POST',
+	   	url: "https://ves.columbiaspectator.com/api/getReviews", //localhost needs to be changed eventually everywhere in file. Also http -> https after testing everywhere in file
+	   	headers: {'Content-Type':'application/json'},
+		data: `{"profName": "${profName}", "courseNumber": "${courseNumber}"}`
+	}).success(function(data, status) {
+	    	console.log(data, "and status is", status)
+	    	setReviewModal(data)
+	});
+}
+
+function avgNums(data, key) {
+	vals = [];
+	for (var i=0; i<data.length; i++) {
+		vals.push(data[i][key]);
+	}
+	sum = vals.reduce(function(a, b) { return a + b; });
+	return Math.floor(sum/vals.length);
+}
+
+function avgBool(data, key) {
+	truths = 0;
+	for (var i=0; i<data.length; i++) {
+		if (data[i][key]) { truths += 1; }
+	}
+	var ans = Math.floor(((truths * 100)/data.length)).toString() + "%"
+	return ans;
+}
+
+function avgPresence(data, key) {
+	count = 0;
+	for (var i=0; i<data.length; i++) {
+		if (data[i].includes(key)) {
+			count += 1;
+		}
+	}
+	var ans = Math.floor(((count * 100)/data.length)).toString()
+
+	if (ans >= 75){
+		return "yes"
+	}
+	else if (ans <= 25){
+		return "no"
+	}
+	return "maybe"
+}
+
+function groupFactors(data) {
+	facts = [];
+	for (var i=0; i<data.length; i++) {
+		facts.push(data[i]['factors']);
+	}
+	return facts;
+}
+
+function setReviewModal(data){
+  	console.log("Review data:", data)
+  	$scope.$parent.activeReviews = data;
+  	$scope.$parent.disToAgree = disToAgree;
+  	$scope.$parent.organized = organized
+  	$scope.$parent.prof_rate = prof_rate
+  	var dataDisplay, header;
+  	if (data.length != 0) {
+		header = `<div class="header"><h1>${$scope.modalSection.instructors[0].name}</h1><h2>${data[0].courseNumber}</h2></div>`
+		
+		// Template for booleans in future
+		// Would ${data[0].professor["take-professor-again"] ? "DEFINITLY" : "DEFINITLY NOT"} take a class with this professor again.<br/>
+
+		results = {};
+		factors_results = {};
+		disp_numbers = ["hoursPerWeek", "grading", "interesting", "effective", "selfTeach", "A-possible", "grading", "organized", "recommendation"];
+		disp_bools = ["requirement"];
+		disp_factors = [
+        	"mandatory recitations",
+        	"pop quizzes",
+        	"graded in class assignments",
+        	"attendance factors into the grade",
+        	"participating in class factors into the grade",
+        	"high monetary costs to taking class",
+        	"class is not curved"
+    	]
+    	grp_factors = groupFactors(data);
+		disp_numbers.forEach(function(key) {
+			results[key] = avgNums(data, key);
+		})
+		disp_bools.forEach(function(key) {
+			results[key] = avgBool(data, key);
+		})
+		disp_factors.forEach(function(key) {
+			factors_results[key] = avgPresence(grp_factors, key);
+		})
+		console.log(factors_results);
+
+		dataDisplay = `<div class="viewingSliderText hours">
+							<div class="question-wrapper">
+								<h4 class="question"> How many hours per week do you devote to this course? </h4>
+								<h4 class="response">${results["hoursPerWeek"]}</h4>
+								<input type="range" min="0" max="50" value=${results["hoursPerWeek"]} class="p_rate disabled" disabled><br/>
+							</div>
+							<div class="question-wrapper">
+								<h4 class="question"> This class was interesting, enjoyable, or useful enough to justify the effort it required. </h4>
+								<h4 class="response"> ${disToAgree[results["interesting"]]}</h4>
+								<input type="range" min="0" max="4" value=${results["interesting"]} class="p_rate disabled" disabled><br/>
+							</div>
+							<div class="question-wrapper">
+								<h4 class="question"> The professor was effective at teaching, being clear, answering questions, and explaining concepts.</h4>
+								<h4 class="response"> ${disToAgree[results["effective"]]}</h4>
+								<input type="range" min="0" max="4" value=${results["effective"]} class="p_rate disabled" disabled><br/>
+							</div>
+							<div class="question-wrapper">
+								<h4 class="question"> It's not necessary to self-teach material in order to do assignments/exams because the lectures were adequate.</h4>
+								<h4 class="response"> ${disToAgree[results["selfTeach"]]}</h4>
+								<input type="range" min="0" max="4" value=${results["selfTeach"]} class="p_rate disabled" disabled><br/>
+							</div>
+							<div class="question-wrapper">
+								<h4 class="question"> It is possible to get an A-range grade without attending most lectures.</h4>
+								<h4 class="response"> ${disToAgree[results["A-possible"]]}</h4>
+								<input type="range" min="0" max="4" value=${results["A-possible"]} class="p_rate disabled" disabled><br/>
+							</div>
+							<div class="question-wrapper">
+								<h4 class="question"> How harsh, fair or lenient was the grading for this class?</h4>
+								<h4 class="response"> ${prof_rate[results["grading"]]}</h4>
+								<input type="range" min="0" max="4" value=${results["grading"]} class="p_rate disabled" disabled><br/>
+							</div>
+							<div class="question-wrapper">
+								<h4 class="question"> How organized and structured is the professor, the curriculum, and the class overall?</h4>
+								<h4 class="response"> ${organized[results["organized"]]}</h4>
+								<input type="range" min="0" max="4" value=${results["organized"]} class="p_rate disabled" disabled><br/>
+							</div>
+							<div class="question-wrapper">
+								<h4 class="question"> I would recommend my particular professor for this course.</h4>
+								<h4 class="response"> ${disToAgree[results["recommendation"]]}</h4>
+								<input type="range" min="0" max="4" value=${results["recommendation"]} class="p_rate disabled" disabled><br/>
+							</div>
+							<h4 class="question question-details">COURSE DETAILS</h4>`
+		
+		Object.keys(factors_results).forEach(function(factor) {
+			dataDisplay += `<div class="factor"><div class="factor-name">${factor}:</div> <div class="factor-result">${factors_results[factor]}</div></div>`
+		})
+
+		dataDisplay += `</div>`;
+
+//this makes the pretty tags
+		modalBody = `
+			<div ng-init="review=0" class="showReview">
+				<div class="navigator">
+					<div>
+						<button ng-disabled="review == 0" ng-click="review = review - 1">&#8249;</button>
+						<p class="page-number" ng-bind="review ? review+'/'+${data.length} : 'Summary'"></p>
+						<button ng-disabled="review == ${data.length}" ng-click="review = review + 1">&#8250;</button>
+					</div>
+				</div>
+				<div ng-show="review == 0">${dataDisplay}</div>
+				<div ng-show="review != 0">
+
+					<div class="row">
+						<div class="col-md-6 col-sm-6">
+							<h4 class="studentInfoTitle">STUDENT INFO</h4>
+							<h4 class="studentInfo">
+								School: {{activeReviews[review-1]["personal"]["school"]}}<br/>
+								Year: {{activeReviews[review-1]["personal"]["year"]}}<br/>
+								Major: {{activeReviews[review-1]["personal"]["major"]}}
+								{{ activeReviews[review-1]["personal"]["concentration"] && 
+									"Minor/Concentration(s): "+activeReviews[review-1]["personal"]["concentration"]}}
+							</h4>
+							<h4 class="studentInfoTitle">COURSE INFO</h4>
+							<h4 class="studentInfo">
+								Professor: {{activeReviews[review-1]["professor"]}}<br/>
+								{{activeReviews[review-1]["personal"]["semester"]}}
+							</h4>
+						</div>
+
+						<div class="col-md-6 col-sm-6">
+							<div class="tags">
+								<label class="pageTag" ng-repeat="tag in activeReviews[review - 1]['factors']">{{tag}}</label>
+							</div>
+						</div>
+					</div>
+
+					<div class="viewingSliderText hours">
+						<div class="question-wrapper">
+							<h4 class="question">How many hours per week do you devote to this course? </h4>
+							<h4 class="response">{{activeReviews[review - 1]["hoursPerWeek"]}}</h4>
+							<input type="range" min="0" max="50" ng-model="activeReviews[review - 1]['hoursPerWeek']" class="p_rate disabled" disabled>
+						</div>
+						
+						<div class="question-wrapper">
+							<h4 class="question">This class was interesting, enjoyable, or useful enough to justify the effort it required. </h4>
+							<h4 class="response">{{disToAgree[activeReviews[review - 1]["interesting"]]}}</h4>
+							<input type="range" min="0" max="4" ng-model="activeReviews[review - 1]['interesting']" class="p_rate disabled" disabled>
+						</div>
+
+						<div class="question-wrapper" ng-if="activeReviews[review - 1]['whyInteresting'].length > 0">
+							<h4 class="question">Explanation:</h4>
+							<div class="text-response">{{activeReviews[review - 1]['whyInteresting']}}</div>
+						</div>
+
+						<div class="question-wrapper">
+							<h4 class="question">The professor was effective at teaching, being clear, answering questions, and explaining concepts. </h4>
+							<h4 class="response">{{disToAgree[activeReviews[review - 1]["effective"]]}}</h4>
+							<input type="range" min="0" max="4" ng-model="activeReviews[review - 1]['effective']" class="p_rate disabled" disabled>
+						</div>
+
+						<div class="question-wrapper">
+							<h4 class="question">It's not necessary to self-teach material in order to do assignments/exams because the lectures were adequate.</h4>
+							<h4 class="response">{{disToAgree[activeReviews[review - 1]["selfTeach"]]}}</h4>
+							<input type="range" min="0" max="4" ng-model="activeReviews[review - 1]['selfTeach']" class="p_rate disabled" disabled>
+						</div>
+
+						<div class="question-wrapper">
+							<h4 class="question">It is possible to get an A-range grade without attending most lectures.</h4>
+							<h4 class="response">{{disToAgree[activeReviews[review - 1]["A-possible"]]}}</h4>
+							<input type="range" min="0" max="4" ng-model="activeReviews[review - 1]['A-possible']" class="p_rate disabled" disabled>
+						</div>
+
+						<div class="question-wrapper">
+							<h4 class="question">How harsh, fair or lenient was the grading for this class?</h4>
+							<h4 class="response">{{prof_rate[activeReviews[review - 1]["grading"]]}}</h4>
+							<input type="range" min="0" max="4" ng-model="activeReviews[review - 1]['grading']" class="p_rate disabled" disabled>
+						</div>
+						
+						<div class="question-wrapper">
+							<h4 class="question">How organized and structured is the professor, the curriculum, and the class overall?</h4>
+							<h4 class="response">{{organized[activeReviews[review - 1]["organized"]]}}</h4>
+							<input type="range" min="0" max="4" ng-model="activeReviews[review - 1]['organized']" class="p_rate disabled" disabled>
+						</div>
+						
+						<div class="question-wrapper">
+							<h4 class="question">I would recommend my particular professor for this course.</h4>
+							<h4 class="response">{{disToAgree[activeReviews[review - 1]["recommendation"]]}}</h4>
+							<input type="range" min="0" max="4" ng-model="activeReviews[review - 1]['recommendation']" class="p_rate disabled" disabled>
+						</div>
+						
+						<div class="question-wrapper" ng-if="activeReviews[review - 1]['explain_recommendation'].length > 0">
+							<h4 class="question">Explain Recommendation:</h4>
+							<div class="text-response">{{activeReviews[review - 1]['explain_recommendation']}}</div>
+						</div>
+					</div>
+				</div>`		
+
+		modalBody +=
+				`	<div class="navigator">
+						<div>
+							<button ng-disabled="review == 0" ng-click="review = review - 1">&#8249;</button>
+							<p class="page-number" ng-bind="review ? review+'/'+${data.length} : 'Summary'"></p>
+							<button ng-disabled="review == ${data.length}" ng-click="review = review + 1">&#8250;</button>
+						</div>
+					</div>
+				</div>
+				`
+
+		// dataDisplay = 
+	 //  		`<h4> Professor Effective: ${data[0].effective}<br/>
+		// 	Professor Grading: ${data[0].grading}<br/>
+		// 	Hours Per Week: ${data[0].hoursPerWeek}<br/>
+	 //  		This professor is: ${data[0].factors}</h4>`;
+	  	
+	} else { // inform user that no review data currently exists
+		var courseNum = $scope.modalCourse.title;
+		var instructor = $scope.modalSection.instructors[0].name;
+		header = `<div class="header"><h1>${instructor}</h1><h2>${courseNum}</h2></div>`
+		datas = "No data for " + instructor + " teaching " + courseNum;
+		modalBody = "<h4 class='modal-no-data'> No data has been submitted for " + instructor + " teaching " + courseNum + ", but please check the course reviews for reviews of other sections of this course.<br><br>Please contribute by reviewing this class!<br>"
+	}
+
+	$scope.modalChange(header, modalBody);
+	$('#myModal').modal('show');
+}
+
+$scope.courseReviewButton = function(course){
+	console.log(course);
+	$http({
+	    method: 'POST',
+	   	url: "https://ves.columbiaspectator.com/api/getCourseReviews", //localhost needs to be changed eventually everywhere in file. Also http -> https after testing everywhere in file
+	   	headers: {'Content-Type':'application/json'},
+		data: `{ "courseNumber": "${course.title}"}`
+	}).success(function(data, status) {
+		modal_header = `<div class="header"><h1>All Professors</h1><h2>${course.title}</h2></div>`
+		console.log("data");
+		console.log(data);
+		var courseNum = course.title;
+		if (data.length > 0) {
+			results = {};
+			factors_results = {};
+			disp_numbers = ["hoursPerWeek", "grading", "interesting", "effective", "selfTeach", "organized", "recommendation", "A-possible"];
+			disp_bools = ["requirement"];
+			disp_factors = [
+	        	"mandatory recitations",
+	        	"pop quizzes",
+	        	"graded in class assignments",
+	        	"attendance factors into the grade",
+	        	"participating in class factors into the grade",
+	        	"high monetary costs to taking class",
+	        	"class is not curved"
+	    	]
+	    	grp_factors = groupFactors(data);
+			disp_numbers.forEach(function(key) {
+				results[key] = avgNums(data, key);
+			})
+			disp_bools.forEach(function(key) {
+				results[key] = avgBool(data, key);
+			})
+			disp_factors.forEach(function(key) {
+				factors_results[key] = avgPresence(grp_factors, key);
+			})
+			console.log(factors_results);
+			console.log("hoursPerWeek");
+			console.log(results["hoursPerWeek"]);
+			dataDisplay = `<div class="viewingSliderText hours">
+								<div class="question-wrapper">
+									<h4 class="question"> 
+									How many hours per week do you devote to this course?</h4>
+									<h4 class="response">${results["hoursPerWeek"]}</h4>
+									<input type="range" min="0" max="50" value=${results["hoursPerWeek"]} class="p_rate disabled" disabled><br/>
+								</div>
+								<div class="question-wrapper">
+									<h4 class="question"> 
+									This class was interesting, enjoyable, or useful enough to justify the effort it required. </h4>
+									<h4 class="response">${disToAgree[results["interesting"]]}</h4>
+									<input type="range" min="0" max="4" value=${results["interesting"]} class="p_rate disabled" disabled><br/>
+								</div>
+								<div class="question-wrapper">
+									<h4 class="question"> 
+									The professor was effective at teaching, being clear, answering questions, and explaining concepts.</h4>
+									<h4 class="response">
+									${disToAgree[results["effective"]]}
+									</h4>
+									<input type="range" min="0" max="4" value=${results["effective"]} class="p_rate disabled" disabled><br/>
+								</div>
+								<div class="question-wrapper">
+									<h4 class="question"> 
+									It's not necessary to self-teach material in order to do assignments/exams because the lectures were adequate.</h4>
+									<h4 class="response"> ${disToAgree[results["selfTeach"]]}</h4>
+									<input type="range" min="0" max="4" value=${results["selfTeach"]} class="p_rate disabled" disabled><br/>
+								</div>
+								<div class="question-wrapper">
+									<h4 class="question"> It is possible to get an A-range grade without attending most lectures.</h4>
+									<h4 class="response"> ${disToAgree[results["A-possible"]]}</h4>
+									<input type="range" min="0" max="4" value=${results["grading"]} class="p_rate disabled" disabled><br/>
+								</div>
+								<div class="question-wrapper">
+									<h4 class="question"> How harsh, fair or lenient was the grading for this class?</h4>
+									<h4 class="response"> ${prof_rate[results["grading"]]}</h4>
+									<input type="range" min="0" max="4" value=${results["grading"]} class="p_rate disabled" disabled><br/>
+								</div>
+								<div class="question-wrapper">
+									<h4 class="question"> How organized and structured is the professor, the curriculum, and the class overall?</h4>
+									<h4 class="response">${organized[results["organized"]]}</h4>
+									<input type="range" min="0" max="4" value=${results["organized"]} class="p_rate disabled" disabled><br/>
+								</div>
+								<div class="question-wrapper">
+									<h4 class="question"> I would recommend my particular professor for this course.</h4>
+									<h4 class="response"> ${disToAgree[results["recommendation"]]}</h4>
+									<input type="range" min="0" max="5" value=${results["recommendation"]} class="p_rate disabled" disabled><br/>
+								</div>
+								<h4 class="question question-details">COURSE DETAILS</h4>`
+			
+			Object.keys(factors_results).forEach(function(factor) {
+				dataDisplay += `<div class="factor"><div class="factor-name">${factor}:</div> <div class="factor-result">${factors_results[factor]}</div></div>`
+			})
+
+			dataDisplay += `</div>`;
+
+			$scope.$parent.activeCourseReviews = data;
+	  		var modal_data, modal_header;
+			modal_body = `
+				<div ng-init="review=0" class="showReview">
+					<div class="navigator">
+						<div>
+							<button ng-disabled="review == 0" ng-click="review = review - 1">&#8249;</button>
+							<p class="page-number" ng-bind="review ? review+'/'+${data.length} : 'Summary'"></p>
+							<button ng-disabled="review == ${data.length}" ng-click="review = review + 1">&#8250;</button>
+						</div>
+					</div>
+					<div ng-show="review == 0">${dataDisplay}</div>
+					<div ng-show="review != 0">
+
+						<div class="row">
+							<div class="col-md-6 col-sm-6">
+								<h4 class="studentInfoTitle">STUDENT INFO</h4>
+								<h4 class="studentInfo">
+									School: {{activeCourseReviews[review-1]["personal"]["school"]}}<br/>
+									Year: {{activeCourseReviews[review-1]["personal"]["year"]}}<br/>
+									Major: {{activeCourseReviews[review-1]["personal"]["major"]}}
+									{{ activeCourseReviews[review-1]["personal"]["concentration"] && 
+										"Minor/Concentration(s): "+activeCourseReviews[review-1]["personal"]["concentration"]}}
+								</h4>
+								<h4 class="studentInfoTitle">COURSE INFO</h4>
+								<h4 class="studentInfo">
+									Professor: {{activeCourseReviews[review-1]["professor"]}}<br/>
+									{{activeCourseReviews[review-1]["personal"]["semester"]}}
+								</h4>
+							</div>
+
+							<div class="col-md-6 col-sm-6">
+								<div class="tags">
+									<label class="pageTag" ng-repeat="tag in activeCourseReviews[review - 1]['factors']">{{tag}}</label>
+								</div>
+							</div>
+						</div>
+
+						<div class="viewingSliderText hours">
+						<div class="question-wrapper">
+							<h4 class="question">How many hours per week do you devote to this course? </h4>
+							<h4 class="response">{{activeCourseReviews[review - 1]['hoursPerWeek']}}</h4>
+							<input type="range" min="0" max="50" ng-model="activeCourseReviews[review - 1]['hoursPerWeek']" class="p_rate disabled" disabled>
+						</div>
+						
+						<div class="question-wrapper">
+							<h4 class="question">This class was interesting, enjoyable, or useful enough to justify the effort it required. </h4>
+							<h4 class="response">{{disToAgree[activeCourseReviews[review - 1]["interesting"]]}}</h4>
+							<input type="range" min="0" max="4" ng-model="activeCourseReviews[review - 1]['interesting']" class="p_rate disabled" disabled>
+						</div>
+
+						<div class="question-wrapper" ng-if="activeCourseReviews[review - 1]['whyInteresting'].length > 0">
+							<h4 class="question">Explanation:</h4>
+							<div class="text-response">{{activeCourseReviews[review - 1]['whyInteresting']}}</div>
+						</div>
+
+						<div class="question-wrapper">
+							<h4 class="question">The professor was effective at teaching, being clear, answering questions, and explaining concepts. </h4>
+							<h4 class="response">{{disToAgree[activeCourseReviews[review - 1]["effective"]]}}</h4>
+							<input type="range" min="0" max="4" ng-model="activeCourseReviews[review - 1]['effective']" class="p_rate disabled" disabled>
+						</div>
+
+						<div class="question-wrapper">
+							<h4 class="question">It's not necessary to self-teach material in order to do assignments/exams because the lectures were adequate.</h4>
+							<h4 class="response">{{disToAgree[activeCourseReviews[review - 1]["selfTeach"]]}}</h4>
+							<input type="range" min="0" max="4" ng-model="activeCourseReviews[review - 1]['selfTeach']" class="p_rate disabled" disabled>
+						</div>
+
+						<div class="question-wrapper">
+							<h4 class="question">It is possible to get an A-range grade without attending most lectures.</h4>
+							<h4 class="response">{{disToAgree[activeCourseReviews[review - 1]["A-possible"]]}}</h4>
+							<input type="range" min="0" max="4" ng-model="activeCourseReviews[review - 1]['A-possible']" class="p_rate disabled" disabled>
+						</div>
+
+						<div class="question-wrapper">
+							<h4 class="question">How harsh, fair or lenient was the grading for this class?</h4>
+							<h4 class="response">{{prof_rate[activeCourseReviews[review - 1]["grading"]]}}</h4>
+							<input type="range" min="0" max="4" ng-model="activeCourseReviews[review - 1]['grading']" class="p_rate disabled" disabled>
+						</div>
+						
+						<div class="question-wrapper">
+							<h4 class="question">How organized and structured is the professor, the curriculum, and the class overall?</h4>
+							<h4 class="response">{{organized[activeCourseReviews[review - 1]["organized"]]}}</h4>
+							<input type="range" min="0" max="4" ng-model="activeCourseReviews[review - 1]['organized']" class="p_rate disabled" disabled>
+						</div>
+						
+						<div class="question-wrapper">
+							<h4 class="question">I would recommend my particular professor for this course.</h4>
+							<h4 class="response">{{disToAgree[activeCourseReviews[review - 1]["recommendation"]]}}</h4>
+							<input type="range" min="0" max="4" ng-model="activeCourseReviews[review - 1]['recommendation']" class="p_rate disabled" disabled>
+						</div>
+						
+						<div class="question-wrapper" ng-if="activeCourseReviews[review - 1]['explain_recommendation'].length > 0">
+							<h4 class="question">Explain Recommendation:</h4>
+							<div class="text-response">{{activeCourseReviews[review - 1]['explain_recommendation']}}</div>
+						</div>
+					</div>
+					</div>`		
+
+			modal_body +=
+					`	<div class="navigator">
+							<div>
+								<button ng-disabled="review == 0" ng-click="review = review - 1">&#8249;</button>
+								<p class="page-number" ng-bind="review ? review+'/'+${data.length} : 'Summary'"></p>
+								<button ng-disabled="review == ${data.length}" ng-click="review = review + 1">&#8250;</button>
+							</div>
+						</div>
+					</div>
+					`
+		} else { // inform user that no review data currently exists
+			modal_body = "<h4 class='modal-no-data'> No data has been submitted for " + courseNum + ".<br>Please contribute by reviewing this class!<br>"
+		}
+
+		$scope.modalChange(modal_header, modal_body);
+		$('#myModal').modal('show');
+
+	});
+}
+
+$scope.actualCourseSubmitReview = function(course) {
+	$scope.$parent.modalCourse = course;
+
+	var header = `<div class="review-modal-header header">
+					<h1>${course.title}</h1>
+				</div>`;
+
+	var submissionForm = `<form ng-submit="submitForm(\'${course.title}\');">`;
+
+	var radioButtons = function(options, name){
+		submissionForm += `<div id="${name}">`
+		submissionForm += '<div class="questionEntry">'
+		options.forEach(function(value, i){
+			if (i === 0){
+				submissionForm += `<label class="radioDiv"> ${value}<input type="radio" value="${value}" name="${name}" checked/><span class="radioSpan"></span></label><br>`
+			}else{
+				submissionForm += `<label class="radioDiv"> ${value}<input type="radio" value="${value}" name="${name}"/><span class="radioSpan"></span></label><br>`
+			}
+		})
+		submissionForm += `</div></div>`
+	}
+
+	var questionTitle = function(question, required){
+		if(required){
+			submissionForm += `<div class="hours"><h4 class="question">${question}<span class="star">*</span></h4></div>`
+		} else {
+			submissionForm += `<div class="hours"><h4 class="question">${question}</h4></div>`
+		}
+	}
+
+	var semesterSelect = function(){
+		var years = []
+		var seasons = ["Spring", "Summer", "Fall"]
+		var start_date = new Date().getFullYear()
+		var last_date = start_date - 4
+
+		while(start_date >= last_date) {
+			years.push(start_date)
+			start_date--
+		}
+		seasonSelect = `<select id="SeasonQ">`
+		for(const i in seasons){
+			seasonSelect += `<option value="${seasons[i]}">${seasons[i]}</option>`
+		}
+		seasonSelect += `</select>`
+
+		yearSelect = `<select id="YearQ">`
+		for(const i in years){
+			yearSelect += `<option value="${years[i]}">${years[i]}</option>`
+		}
+		yearSelect += `</select>`
+
+		submissionForm += `<div class="semester-select">${seasonSelect}${yearSelect}</div>`
+	}
+
+	var slider = function(options, idName){
+		// options[parseInt($("#"+idName).prop("value"))]
+		console.log($("#" + idName));
+		console.log()
+
+		if (window.sliderOptions === undefined) window.sliderOptions = {}
+		window.sliderOptions[idName] = options;
+
+		submissionForm += `<div class = sliderEntry><output class="sliderOutput" id="${idName}Out">${options[2]}</output></div>`
+		submissionForm += `<div class="hours">
+								<input type="range" 
+										min="0" max="4" 
+										value="2" 
+										class="hours" 
+										id="${idName}" 
+										oninput="${idName}Out.value = window.sliderOptions['${idName}'][${idName}.value]; ${idName}Out.style.left = (${idName}.value / ${idName}.max * 100) + '%'"
+								>
+								<script>
+									${idName}Out.value = window.sliderOptions['${idName}'][${idName}.value]; ${idName}Out.style.left = (${idName}.value / ${idName}.max * 100) + '%'
+								</script>
+								</br>
+							</div>`
+		/* submissionForm += `<input type="range" min="0" max="4" value="2" class="slider" id="${idName}" oninput="${idName}Out.value = ${options[${idName}.value")]}"><br>` */
+	}
+
+	var textbox = function(placeHolder, idName, text = "") {
+		submissionForm += '<div class="questionEntry">'
+		submissionForm += `<div id="${idName}"><div class="boxes"><textarea placeholder="${placeHolder}">${text}</textarea></div></div>`
+		submissionForm += '</div>'
+	}
+
+
+	questionTitle("What year are you?", true)
+	radioButtons(["First Year", "Sophomore", "Junior", "Senior", "Other"], 'yearQ')
+
+	questionTitle("What school are you?", true)
+	radioButtons(["CC", "SEAS", "Barnard", "GS", "Other"], 'schoolQ')
+
+	questionTitle("What major are you?", true)
+	textbox("Enter major here", "majorEntry")
+
+	questionTitle("What is your second major or concentration, if any? (optional)", false)
+	textbox("Enter second major/concentration here", "secondMajor")
+
+	questionTitle("What professor did you have?", true)
+	textbox("", "professorName", "",)
+
+	questionTitle("What semester did you take this course?", true)
+	semesterSelect()
+
+	questionTitle("On average, how many hours per week do you devote to this course?", true)
+	submissionForm += `<div class = "questionEntry"><div id="hoursPerWeek"><input type="number"
+		placeholder="0" 
+		step="1" 
+		min="0" 
+		max="50"/>
+		<script>
+			document.querySelector('#hoursPerWeek input').addEventListener("mousewheel", event => document.querySelector('#hoursPerWeek input').blur())
+		</script>
+	<label >hours per week</label></div></div>`	
+
+	questionTitle("How harsh, fair, or lenient was the grading for your class?", true)
+	slider(prof_rate, "prof_rating")
+
+	questionTitle("Overall, I found this class interesting, enjoyable, or useful enough to justify the amount of effort this class required.", true)
+	slider(disToAgree, "interest_class")
+
+	questionTitle("Please explain further. (optional)", false)
+	textbox("", "whyInteresting")
+
+	questionTitle("I am satisfied with how effective this professor was at teaching, being clear, answering questions, and explaining concepts.", true)
+	slider(disToAgree, "good_teacher")
+
+	questionTitle("I did not need to self-teach material in order to do assignments/exams because the lectures were adequate.", true)
+	slider(disToAgree, "self_teaching")
+
+	questionTitle("It is possible to get an A-range grade without attending most lectures.", true)
+	slider(disToAgree, "easy_a")
+
+	questionTitle("How organized and structured is the professor, the curriculum, and the class overall?", true)
+	slider(["Very Disorganized", "Somewhat Disorganized", "Average", "Somewhat Organized", "Very Organized"], "organizational_skills")
+
+	questionTitle("I would recommend my particular professor for this course.", true)
+	slider(disToAgree, "recommend_prof")
+
+	questionTitle("Please explain further (optional)", false)
+	textbox("", "recommendProfText")
+
+	questionTitle("Please check off all the factors that apply to this class", false)
+
+	const tags = ["Mandatory Recitations",
+		"Pop Quizzes",
+		"Graded In-class Assignments",
+		"Attendance Factors Into The Grade",
+		"Participating In Class Factors Into The Grade",
+		"High Monetary Costs To Taking Class",
+		"Class Is Not Curved"];
+
+	submissionForm += `<div class="tags" id="tagChoices">`
+	for (var i = 0; i < tags.length; i++) {
+		submissionForm += "<input type=\"checkbox\" value=\""+tags[i]+"\" id=\""+tags[i]+"\"><label for=\""+tags[i]+"\"> "+tags[i]+"</label>"
+	}
+	submissionForm += `</div>`
+
+	//submissionForm += `</div>`
+	// submissionForm += `<br/><input class="btn btn-lg btn-submit" type="submit" value="Submit" ng-click="submitForm(\'${section.instructors[0].name}\', \'${course.title}\')"></form></div>`
+	submissionForm += `<br/><div class="submitClass"><input class="btn btn-lg btn-submit" type="submit" value="Submit"></div></form></div>`
+	footer = "";
+
+	$scope.modalChange(header, `<div class="submissionForm">${submissionForm}</div>`, footer);
+	$('#myModal').modal('show');
+}
+
+$scope.submitReviewsButton = function(section, course) {
+	$scope.$parent.modalSection = section;
+	$scope.$parent.modalCourse = course;
+
+	var header = `<div class="review-modal-header header">
+					<h1>${$scope.modalSection.instructors[0].name}</h1>
+					<h2>${course.title}</h2>
+				</div>`;
+
+	var submissionForm = `<form ng-submit="submitForm(\'${course.title}\');">`;
+
+	var radioButtons = function(options, name){
+		submissionForm += `<div id="${name}">`
+		submissionForm += '<div class="questionEntry">'
+		options.forEach(function(value, i){
+			if (i === 0){
+				submissionForm += `<label class="radioDiv"> ${value}<input type="radio" value="${value}" name="${name}" checked/><span class="radioSpan"></span></label><br>`
+			}else{
+				submissionForm += `<label class="radioDiv"> ${value}<input type="radio" value="${value}" name="${name}"/><span class="radioSpan"></span></label><br>`
+			}
+		})
+		submissionForm += `</div></div>`
+	}
+
+	var questionTitle = function(question, required){
+		if(required){
+			submissionForm += `<div class="hours"><h4 class="question">${question}<span class="star">*</span></h4></div>`
+		} else {
+			submissionForm += `<div class="hours"><h4 class="question">${question}</h4></div>`
+		}
+	}
+
+	var semesterSelect = function(){
+		var years = []
+		var seasons = ["Spring", "Summer", "Fall"]
+		var start_date = new Date().getFullYear()
+		var last_date = start_date - 4
+
+		while(start_date >= last_date) {
+			years.push(start_date)
+			start_date--
+		}
+		seasonSelect = `<select id="SeasonQ">`
+		for(const i in seasons){
+			seasonSelect += `<option value="${seasons[i]}">${seasons[i]}</option>`
+		}
+		seasonSelect += `</select>`
+
+		yearSelect = `<select id="YearQ">`
+		for(const i in years){
+			yearSelect += `<option value="${years[i]}">${years[i]}</option>`
+		}
+		yearSelect += `</select>`
+
+		submissionForm += `<div class="semester-select">${seasonSelect}${yearSelect}</div>`
+	}
+
+	var slider = function(options, idName){
+		// options[parseInt($("#"+idName).prop("value"))]
+		console.log($("#" + idName));
+		console.log()
+
+		if (window.sliderOptions === undefined) window.sliderOptions = {}
+		window.sliderOptions[idName] = options;
+
+		submissionForm += `<div class = sliderEntry><output class="sliderOutput" id="${idName}Out">${options[2]}</output></div>`
+		submissionForm += `<div class="hours">
+								<input type="range" 
+										min="0" max="4" 
+										value="2" 
+										class="hours" 
+										id="${idName}" 
+										oninput="${idName}Out.value = window.sliderOptions['${idName}'][${idName}.value]; ${idName}Out.style.left = (${idName}.value / ${idName}.max * 100) + '%'"
+								>
+								<script>
+									${idName}Out.value = window.sliderOptions['${idName}'][${idName}.value]; ${idName}Out.style.left = (${idName}.value / ${idName}.max * 100) + '%'
+								</script>
+								<br>
+							</div>`
+		/* submissionForm += `<input type="range" min="0" max="4" value="2" class="slider" id="${idName}" oninput="${idName}Out.value = ${options[${idName}.value")]}"><br>` */
+	}
+
+	var textbox = function(placeHolder, idName, text = "") {
+		submissionForm += '<div class="questionEntry">'
+		submissionForm += `<div id="${idName}"><div class="boxes"><textarea placeholder="${placeHolder}">${text}</textarea></div></div>`
+		submissionForm += '</div>'
+	}
+
+
+	questionTitle("What year are you?", true)
+	radioButtons(["First Year", "Sophomore", "Junior", "Senior", "Other"], 'yearQ')
+
+	questionTitle("What school are you?", true)
+	radioButtons(["CC", "SEAS", "Barnard", "GS", "Other"], 'schoolQ')
+
+	questionTitle("What major are you?", true)
+	textbox("Enter major here", "majorEntry")
+
+	questionTitle("What is your second major or concentration, if any? (optional)", false)
+	textbox("Enter second major/concentration here", "secondMajor")
+
+	questionTitle("What professor did you have?", true)
+	textbox("", "professorName", $scope.modalSection.instructors[0].name, )
+
+	questionTitle("What semester did you take this course?", true)
+	semesterSelect()
+
+	questionTitle("On average, how many hours per week do you devote to this course?", true)
+	submissionForm += `<div class = "questionEntry"><div id="hoursPerWeek"><input type="number"
+		placeholder="0" 
+		step="1" 
+		min="0" 
+		max="50"/>
+		<script>
+			document.querySelector('#hoursPerWeek input').addEventListener("mousewheel", event => document.querySelector('#hoursPerWeek input').blur())
+		</script>
+	<label >hours per week</label></div></div>`	
+
+	questionTitle("How harsh, fair, or lenient was the grading for your class?", true)
+	slider(prof_rate, "prof_rating")
+
+	questionTitle("Overall, I found this class interesting, enjoyable, or useful enough to justify the amount of effort this class required.", true)
+	slider(disToAgree, "interest_class")
+
+	questionTitle("Please explain further (optional)", false)
+	textbox("", "whyInteresting")
+
+	questionTitle("I am satisfied with how effective this professor was at teaching, being clear, answering questions, and explaining concepts.", true)
+	slider(disToAgree, "good_teacher")
+
+	questionTitle("I did not need to self-teach material in order to do assignments/exams because the lectures were adequate.", true)
+	slider(disToAgree, "self_teaching")
+
+	questionTitle("It is possible to get an A-range grade without attending most lectures.", true)
+	slider(disToAgree, "easy_a")
+
+	questionTitle("How organized and structured is the professor, the curriculum, and the class overall?", true)
+	slider(["Very Disorganized", "Somewhat Disorganized", "Average", "Somewhat Organized", "Very Organized"], "organizational_skills")
+
+	questionTitle("I would recommend my particular professor for this course.", true)
+	slider(disToAgree, "recommend_prof")
+
+	questionTitle("Please explain further (optional)", false)
+	textbox("", "recommendProfText")
+
+	questionTitle("Please check off all the factors that apply to this class", false)
+
+	const tags = ["Mandatory Recitations",
+		"Pop Quizzes",
+		"Graded In-class Assignments",
+		"Attendance Factors Into The Grade",
+		"Participating In Class Factors Into The Grade",
+		"High Monetary Costs To Taking Class",
+		"Class Is Not Curved"];
+
+	submissionForm += `<div class="tags" id="tagChoices">`
+	for (var i = 0; i < tags.length; i++) {
+		submissionForm += "<input type=\"checkbox\" value=\""+tags[i]+"\" id=\""+tags[i]+"\"><label for=\""+tags[i]+"\"> "+tags[i]+"</label>"
+	}
+	submissionForm += `</div>`
+
+	//submissionForm += `</div>`
+	// submissionForm += `<br/><input class="btn btn-lg btn-submit" type="submit" value="Submit" ng-click="submitForm(\'${section.instructors[0].name}\', \'${course.title}\')"></form></div>`
+	submissionForm += `<br/><div class="submitClass"><input class="btn btn-lg btn-submit" type="submit" value="Submit"></div></form></div>`
+
+	//var footer = `<div><p><a ng-click="moreInfoClicked(\'${section.instructors[0].name}\', \'${course.title}\')">More information</a></p></div>`
+	//var footer = '<div></div>'
+
+	 $scope.modalChange(header, `<div class="submissionForm">${submissionForm}</div>`, );
+	 $('#myModal').modal('show');
+}
+
 });
+
+
 
 app.controller("searchresults", function($scope, $location, $http, $filter, $timeout, UserFavorites, CWApi, CWFeeds) {
 	var formListener = $scope.$watch('form', $scope.processContextualCourses, true);
@@ -4173,6 +5485,55 @@ app.controller("myplanner", function($scope, $location, $http, $timeout, Variabl
 			$icsExport.vergilics.download();
 
 			ga('send', 'event', 'Export to Calendar', $scope.active.Tab);
+		}
+	}
+
+	$scope.exportGcal = function() {
+		$scope.modalChange(
+			"Calendar List",
+			"<div class='dropdown'><select class='calList'></select></div>",
+			`
+			<div ng-init="clicked = false">
+				<button type="button" class="btn btn-default" ng-show="!clicked" ng-click="gcal.callback(); clicked = true">Submit</button>
+				<button class="btn btn-success" ng-show="clicked">Success!</button>
+			</div>
+			`
+		);
+		var events = [];
+		var CLIENT_ID= "685293451899-jv0dpc73t9rcgjsic0orv459sungpf6f.apps.googleusercontent.com"
+		var API_KEY = "AIzaSyB1W0eqGjeUiWZjCyk0_wn5LoUPRLWJs-s";
+		var DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"];
+		var SCOPES = "https://www.googleapis.com/auth/calendar.readonly";
+
+		$("#export-to-calendar").tooltip('destroy').removeAttr("data-toggle");
+
+		for (course in $scope.courses.data[$scope.active.Tab].courses) {
+			var thisCourse = $scope.courses.data[$scope.active.Tab].courses[course];
+			for (section in $scope.courses.data[$scope.active.Tab].courses[course].sections) {
+				var thisSection = $scope.courses.data[$scope.active.Tab].courses[course].sections[section];
+				if (thisSection.added_to_schedule == 1 && !thisSection.isPersonalEvent) {
+					if (thisSection.times[0]) {
+						for (weekday in thisSection.times[0].weekdays) {
+							data = {
+								'eventId': thisSection.uci,
+								'title': thisCourse.title,
+								'description': thisSection.description,
+								'startTime': String(thisSection.times[0].mTimeFrom) + "00",
+								'endTime': String(thisSection.times[0].mTimeTo) + "00",
+								'location': thisSection.times[0].location,
+								'dayOfWeek': $scope.favorites.weekdays[weekday].unit
+							};
+							events.push(data);
+						}
+					}
+				}
+			}
+		}
+		if (events.length) {
+			$icsExport = $().vergilgcal({'events': events});
+			//$icsExport.vergilics.download();
+
+			ga('send', 'event', 'Export to Google Calendars', $scope.active.Tab);
 		}
 	}
 
@@ -4777,12 +6138,19 @@ $scope.anchor = function(val) {
 	console.log(val);
 }
 
-var make_checkbox = function(txt) {
+var make_checkbox = function(txt, id) {
 	var div = document.createElement("div");
 
 	var cb = document.createElement("input");
 	cb.setAttribute("value", txt);
 	cb.setAttribute("type", "checkbox");
+
+	var status = localStorage.getItem("checkboxes:" + LZString.compressToUTF16(id));
+	cb.checked = status;
+
+	cb.addEventListener("click", (event) => {
+		localStorage.setItem("checkboxes:" + LZString.compressToUTF16(id), cb.checked);
+	})
 	// return cb;
 
 	div.innerText = txt;
@@ -4790,7 +6158,7 @@ var make_checkbox = function(txt) {
 	return div;
 }
 
-var build_checklist = function(data) {
+var build_checklist = function(data, travel) {
 
 	// comment
 	if (typeof data == 'string') {
@@ -4805,7 +6173,7 @@ var build_checklist = function(data) {
 		ul.setAttribute("style", "list-style: none");
 		for (var i=0; i<data.length; i++) {
 			var li = document.createElement("li");
-			li.appendChild( build_checklist(data[i]) );
+			li.appendChild( build_checklist(data[i], travel + i) );
 			ul.appendChild(li);
 		}
 		return ul;
@@ -4814,7 +6182,7 @@ var build_checklist = function(data) {
 	// class item -- just return checkbox of it
 	var kys = Object.keys(data);
 	if (kys.indexOf('code')!=-1 && kys.indexOf('title')!=-1) {
-		return make_checkbox(" " + data['code'] + " " + data['title']);
+		return make_checkbox(" " + data['code'] + " " + data['title'], travel);
 	}
 
 	if (kys.length == 1) {
@@ -4822,7 +6190,7 @@ var build_checklist = function(data) {
 		var h4 = document.createElement("h4");
 		h4.innerHTML = kys[0];
 		div.appendChild(h4);
-		div.appendChild( build_checklist(data[kys[0]]));
+		div.appendChild( build_checklist(data[kys[0]], travel + kys[0]));
 		return div;
 	} else {
 		var children = [];
@@ -4831,7 +6199,7 @@ var build_checklist = function(data) {
 		for (var i=0; i<kys.length; i++) {
 			var pass_data = {};
 			pass_data[kys[i]] = data[kys[i]];
-			var this_list = build_checklist(pass_data);
+			var this_list = build_checklist(pass_data, travel + kys[i]);
 			var li = document.createElement("li");
 			li.appendChild(this_list);
 			ul.appendChild(li);
@@ -4850,6 +6218,7 @@ $scope.$watch('program', function() {
 		$scope.global.progwidgetSelected = true;
 
 		// $("#program-information .ng-scope").show()
+		// var my_url = 'https://ves.columbiaspectator.com/api/getMajorData';
 		var my_url = 'https://ves.columbiaspectator.com/api/getMajorData';
 		majorDataGet = $http({
 			"method": "POST",
@@ -4862,9 +6231,37 @@ $scope.$watch('program', function() {
 
 		majorDataGet.then(function(my_rec_data) {
 			data = my_rec_data['data'];
+			var travel_data = data.Department;
 			delete data._id;
 			delete data.Department;
-			$scope.programInfo = build_checklist(data);
+
+			var this_prog = $('#program_chosen').get(0).firstChild.firstChild.innerHTML;
+
+			$scope.sendEmailFxn = function() {
+				var fdbk = prompt("Please tell us the issue with this data so we can fix it!");
+		    	if (fdbk != null) {
+			    	sendEmail = $http({
+						"method": "POST",
+						"url": my_url,
+						"data": angular.toJson({'program': this_prog, "feedback": fdbk}),
+						"headers": {},
+						"responseType": 'json',
+						'ignoreLoadingBar': true
+					});
+					sendEmail.then(function(data) { console.log("Email sent for " + $scope.program); });
+			    }
+		    };
+
+			// my_url = 'https://ves.columbiaspectator.com/api/reportBadData';
+			my_url = 'https://ves.columbiaspectator.com/api/reportBadData';
+		    var bad_data_btn = document.createElement("button");
+		    bad_data_btn.innerHTML = "Inaccurate data?";
+		    bad_data_btn.setAttribute("style","color: black");
+		    bad_data_btn.setAttribute("id", "badData");
+		    bad_data_btn.setAttribute('ng-click', 'sendEmailFxn()');
+
+		    $scope.programInfo = bad_data_btn.outerHTML;
+			$scope.programInfo += build_checklist(data, travel_data).outerHTML;
 	    });
 
 		if (!$scope.programInfo) {
@@ -4915,3 +6312,5 @@ $scope.$watch('program', function() {
 });
 
 });
+
+var LZString=function(){function o(o,r){if(!t[o]){t[o]={};for(var n=0;n<o.length;n++)t[o][o.charAt(n)]=n}return t[o][r]}var r=String.fromCharCode,n="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",e="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-$",t={},i={compressToBase64:function(o){if(null==o)return"";var r=i._compress(o,6,function(o){return n.charAt(o)});switch(r.length%4){default:case 0:return r;case 1:return r+"===";case 2:return r+"==";case 3:return r+"="}},decompressFromBase64:function(r){return null==r?"":""==r?null:i._decompress(r.length,32,function(e){return o(n,r.charAt(e))})},compressToUTF16:function(o){return null==o?"":i._compress(o,15,function(o){return r(o+32)})+" "},decompressFromUTF16:function(o){return null==o?"":""==o?null:i._decompress(o.length,16384,function(r){return o.charCodeAt(r)-32})},compressToUint8Array:function(o){for(var r=i.compress(o),n=new Uint8Array(2*r.length),e=0,t=r.length;t>e;e++){var s=r.charCodeAt(e);n[2*e]=s>>>8,n[2*e+1]=s%256}return n},decompressFromUint8Array:function(o){if(null===o||void 0===o)return i.decompress(o);for(var n=new Array(o.length/2),e=0,t=n.length;t>e;e++)n[e]=256*o[2*e]+o[2*e+1];var s=[];return n.forEach(function(o){s.push(r(o))}),i.decompress(s.join(""))},compressToEncodedURIComponent:function(o){return null==o?"":i._compress(o,6,function(o){return e.charAt(o)})},decompressFromEncodedURIComponent:function(r){return null==r?"":""==r?null:(r=r.replace(/ /g,"+"),i._decompress(r.length,32,function(n){return o(e,r.charAt(n))}))},compress:function(o){return i._compress(o,16,function(o){return r(o)})},_compress:function(o,r,n){if(null==o)return"";var e,t,i,s={},p={},u="",c="",a="",l=2,f=3,h=2,d=[],m=0,v=0;for(i=0;i<o.length;i+=1)if(u=o.charAt(i),Object.prototype.hasOwnProperty.call(s,u)||(s[u]=f++,p[u]=!0),c=a+u,Object.prototype.hasOwnProperty.call(s,c))a=c;else{if(Object.prototype.hasOwnProperty.call(p,a)){if(a.charCodeAt(0)<256){for(e=0;h>e;e++)m<<=1,v==r-1?(v=0,d.push(n(m)),m=0):v++;for(t=a.charCodeAt(0),e=0;8>e;e++)m=m<<1|1&t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}else{for(t=1,e=0;h>e;e++)m=m<<1|t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t=0;for(t=a.charCodeAt(0),e=0;16>e;e++)m=m<<1|1&t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}l--,0==l&&(l=Math.pow(2,h),h++),delete p[a]}else for(t=s[a],e=0;h>e;e++)m=m<<1|1&t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;l--,0==l&&(l=Math.pow(2,h),h++),s[c]=f++,a=String(u)}if(""!==a){if(Object.prototype.hasOwnProperty.call(p,a)){if(a.charCodeAt(0)<256){for(e=0;h>e;e++)m<<=1,v==r-1?(v=0,d.push(n(m)),m=0):v++;for(t=a.charCodeAt(0),e=0;8>e;e++)m=m<<1|1&t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}else{for(t=1,e=0;h>e;e++)m=m<<1|t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t=0;for(t=a.charCodeAt(0),e=0;16>e;e++)m=m<<1|1&t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}l--,0==l&&(l=Math.pow(2,h),h++),delete p[a]}else for(t=s[a],e=0;h>e;e++)m=m<<1|1&t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;l--,0==l&&(l=Math.pow(2,h),h++)}for(t=2,e=0;h>e;e++)m=m<<1|1&t,v==r-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;for(;;){if(m<<=1,v==r-1){d.push(n(m));break}v++}return d.join("")},decompress:function(o){return null==o?"":""==o?null:i._decompress(o.length,32768,function(r){return o.charCodeAt(r)})},_decompress:function(o,n,e){var t,i,s,p,u,c,a,l,f=[],h=4,d=4,m=3,v="",w=[],A={val:e(0),position:n,index:1};for(i=0;3>i;i+=1)f[i]=i;for(p=0,c=Math.pow(2,2),a=1;a!=c;)u=A.val&A.position,A.position>>=1,0==A.position&&(A.position=n,A.val=e(A.index++)),p|=(u>0?1:0)*a,a<<=1;switch(t=p){case 0:for(p=0,c=Math.pow(2,8),a=1;a!=c;)u=A.val&A.position,A.position>>=1,0==A.position&&(A.position=n,A.val=e(A.index++)),p|=(u>0?1:0)*a,a<<=1;l=r(p);break;case 1:for(p=0,c=Math.pow(2,16),a=1;a!=c;)u=A.val&A.position,A.position>>=1,0==A.position&&(A.position=n,A.val=e(A.index++)),p|=(u>0?1:0)*a,a<<=1;l=r(p);break;case 2:return""}for(f[3]=l,s=l,w.push(l);;){if(A.index>o)return"";for(p=0,c=Math.pow(2,m),a=1;a!=c;)u=A.val&A.position,A.position>>=1,0==A.position&&(A.position=n,A.val=e(A.index++)),p|=(u>0?1:0)*a,a<<=1;switch(l=p){case 0:for(p=0,c=Math.pow(2,8),a=1;a!=c;)u=A.val&A.position,A.position>>=1,0==A.position&&(A.position=n,A.val=e(A.index++)),p|=(u>0?1:0)*a,a<<=1;f[d++]=r(p),l=d-1,h--;break;case 1:for(p=0,c=Math.pow(2,16),a=1;a!=c;)u=A.val&A.position,A.position>>=1,0==A.position&&(A.position=n,A.val=e(A.index++)),p|=(u>0?1:0)*a,a<<=1;f[d++]=r(p),l=d-1,h--;break;case 2:return w.join("")}if(0==h&&(h=Math.pow(2,m),m++),f[l])v=f[l];else{if(l!==d)return null;v=s+s.charAt(0)}w.push(v),f[d++]=s+v.charAt(0),h--,s=v,0==h&&(h=Math.pow(2,m),m++)}}};return i}();"function"==typeof define&&define.amd?define(function(){return LZString}):"undefined"!=typeof module&&null!=module&&(module.exports=LZString);
